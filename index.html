@@ -136,6 +136,19 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
 .sq-title{font-size:15px;font-weight:700}
 .sq-code{background:#060d1a;border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;white-space:pre;overflow-x:auto;margin-bottom:.75rem}
 .sq-outs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem}
+.editor-wrap{margin-top:.75rem;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.editor-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.editor-bar span{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.editor-area{width:100%;min-height:120px;background:#060d1a;color:#e8f0fe;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;padding:.75rem 1rem;border:none;outline:none;resize:vertical;tab-size:4}
+.run-btn{padding:5px 14px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:var(--bg);font-family:'Syne',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px}
+.run-btn:disabled{opacity:.5;cursor:not-allowed}
+.run-output{padding:.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;min-height:40px;white-space:pre-wrap;border-top:1px solid var(--border)}
+.run-output.idle{color:var(--muted)}
+.run-output.running{color:var(--warn)}
+.run-output.ok{background:#0a1a10;color:#6effa0}
+.run-output.err{background:#1a0a0d;color:#ff8a96}
+.run-output.pass{background:#0a1a10;border-top:2px solid var(--accent);color:#6effa0}
+.pass-banner{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:4px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
 .overlay.open{display:flex}
 .modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;max-width:460px;width:95vw}
@@ -334,6 +347,7 @@ const teamsRef = db.ref('teams');
 //  App state
 // ─────────────────────────────────────────────
 var ADMIN_PASS = 'admin123';
+// Piston API — free, no key needed
 var teams = [];
 var currentTeam = null;
 var currentGame = {};
@@ -557,6 +571,13 @@ function enterTeam(t){
   renderTeamScreen();
 }
 
+// Judge0 language IDs
+var PISTON_LANG = {
+  Python: {language:'python', version:'3.10.0'},
+  Java:   {language:'java',   version:'15.0.2'},
+  C:      {language:'c',      version:'10.2.0'}
+};
+
 function renderTeamScreen(){
   var body=document.getElementById('t-body'); if(!body) return;
   var g=currentGame||{};
@@ -569,7 +590,9 @@ function renderTeamScreen(){
   }
   if(rlbl) rlbl.textContent='Round '+r;
   var qs=QS.filter(function(q){ return q.round===r; });
-  var html='<div class="sq-list">';
+
+  // Build cards — attach editors after innerHTML set
+  var cards=[];
   qs.forEach(function(q){
     var lang=q.lang||(q.langs&&q.langs[0])||'Python';
     var code=q.langs?q.codes[q.langs[0]]:q.code;
@@ -578,9 +601,12 @@ function renderTeamScreen(){
     var langBadge=q.langs
       ?q.langs.map(function(l){return '<span class="rbadge b'+l.toLowerCase()+'">'+l+'</span>';}).join(' ')
       :'<span class="rbadge b'+lang.toLowerCase()+'">'+lang+'</span>';
-    html+='<div class="sq-card">';
+    var editorId='ed-'+q.id;
+    var outputId='out-'+q.id;
+    var btnId='btn-'+q.id;
+    var html='<div class="sq-card" id="card-'+q.id+'">';
     html+='<div class="sq-card-head"><span class="rbadge '+['',"rb1","rb2","rb3"][r]+'">Round '+r+'</span>';
-    html+='<span style="font-size:11px;color:var(--muted)">Q'+q.num+' &middot; '+q.pts+' pts</span>';
+    html+='<span style="font-size:11px;color:var(--muted)">'+q.num+' &middot; '+q.pts+' pts</span>';
     html+=langBadge;
     html+='<span class="sq-title">'+esc(q.title)+'</span></div>';
     html+='<div style="font-size:12px;color:var(--muted);font-style:italic;margin-bottom:.75rem;padding:7px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--border)">&ldquo;'+esc(q.funny)+'&rdquo;</div>';
@@ -589,11 +615,82 @@ function renderTeamScreen(){
     html+='<div class="sq-outs">';
     html+='<div><div class="sec-lbl">Buggy output</div><div class="out-box out-bad">'+esc(q.bugOut)+'</div></div>';
     html+='<div><div class="sec-lbl">Expected output</div><div class="out-box out-ok">'+esc(q.goodOut)+'</div></div>';
-    html+='</div></div>';
+    html+='</div>';
+    // Editor section
+    html+='<div class="editor-wrap">';
+    html+='<div class="editor-bar"><span>&#9998; Fix &amp; Run your solution ('+lang+')</span>';
+    html+='<button class="run-btn" id="'+btnId+'" onclick="runCode(\''+q.id+'\',\''+lang+'\')">&#9654; Run</button></div>';
+    html+='<textarea class="editor-area" id="'+editorId+'" spellcheck="false">'+rawCode(q,lang)+'</textarea>';
+    html+='<div class="run-output idle" id="'+outputId+'">Output will appear here...</div>';
+    html+='</div>';
+    html+='</div>';
+    cards.push(html);
   });
-  html+='</div>';
-  body.innerHTML=html;
+
+  body.innerHTML='<div class="sq-list">'+cards.join('')+'</div>';
+
+  // Enable Tab key in all editors
+  body.querySelectorAll('.editor-area').forEach(function(ta){
+    ta.addEventListener('keydown', function(e){
+      if(e.key==='Tab'){e.preventDefault();var s=ta.selectionStart;ta.value=ta.value.substring(0,s)+'    '+ta.value.substring(ta.selectionEnd);ta.selectionStart=ta.selectionEnd=s+4;}
+    });
+  });
 }
+
+function rawCode(q, lang){
+  return q.langs ? (q.codes[lang]||q.codes[q.langs[0]]) : (q.code||'');
+}
+
+function runCode(qid, lang){
+  var ta=document.getElementById('ed-'+qid);
+  var out=document.getElementById('out-'+qid);
+  var btn=document.getElementById('btn-'+qid);
+  if(!ta||!out) return;
+  var code=ta.value;
+  var pl=PISTON_LANG[lang]||PISTON_LANG.Python;
+  out.className='run-output running'; out.textContent='⏳ Compiling and running...';
+  btn.disabled=true;
+
+  fetch('https://emkc.org/api/v2/piston/execute',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      language: pl.language,
+      version:  pl.version,
+      files:[{name:'main',content:code}],
+      stdin:''
+    })
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    btn.disabled=false;
+    var run=data.run||{};
+    var output=((run.stdout||'')+(run.stderr||'')).trim()||'(no output)';
+
+    var q=QS.find(function(x){return x.id===qid;});
+    var expected=(q?q.goodOut:'').trim();
+    var firstExpected=expected.split('\n')[0].trim();
+    var passed=firstExpected && output.indexOf(firstExpected)>=0;
+
+    if(run.code!==0 && !run.stdout){
+      out.className='run-output err';
+      out.textContent=output;
+    } else if(passed){
+      out.className='run-output pass';
+      out.innerHTML='<div class="pass-banner">✓ Output matches expected!</div>'+escHtml(output);
+    } else {
+      out.className='run-output ok';
+      out.textContent=output;
+    }
+  })
+  .catch(function(err){
+    btn.disabled=false;
+    out.className='run-output err';
+    out.textContent='Connection error: '+err.message;
+  });
+}
+
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function goLogout(){
   currentTeam=null; currentQ=null;
