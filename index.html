@@ -573,9 +573,9 @@ function enterTeam(t){
 
 // Judge0 language IDs
 var PISTON_LANG = {
-  Python: {language:'python', version:'3.10.0'},
-  Java:   {language:'java',   version:'15.0.2'},
-  C:      {language:'c',      version:'10.2.0'}
+  Python: {language:'python', version:'3.10.0', ext:'main.py'},
+  Java:   {language:'java',   version:'15.0.2', ext:'Main.java'},
+  C:      {language:'c',      version:'10.2.0', ext:'main.c'}
 };
 
 function renderTeamScreen(){
@@ -620,7 +620,7 @@ function renderTeamScreen(){
     html+='<div class="editor-wrap">';
     html+='<div class="editor-bar"><span>&#9998; Fix &amp; Run your solution ('+lang+')</span>';
     html+='<button class="run-btn" id="'+btnId+'" onclick="runCode(\''+q.id+'\',\''+lang+'\')">&#9654; Run</button></div>';
-    html+='<textarea class="editor-area" id="'+editorId+'" spellcheck="false">'+rawCode(q,lang)+'</textarea>';
+    html+='<textarea class="editor-area" id="'+editorId+'" spellcheck="false"></textarea>';
     html+='<div class="run-output idle" id="'+outputId+'">Output will appear here...</div>';
     html+='</div>';
     html+='</div>';
@@ -628,6 +628,13 @@ function renderTeamScreen(){
   });
 
   body.innerHTML='<div class="sq-list">'+cards.join('')+'</div>';
+
+  // Populate editors with raw code via .value (avoids HTML encoding issues)
+  qs.forEach(function(q){
+    var lang=q.lang||(q.langs&&q.langs[0])||'Python';
+    var ta=document.getElementById('ed-'+q.id);
+    if(ta) ta.value=rawCode(q,lang);
+  });
 
   // Enable Tab key in all editors
   body.querySelectorAll('.editor-area').forEach(function(ta){
@@ -638,7 +645,13 @@ function renderTeamScreen(){
 }
 
 function rawCode(q, lang){
-  return q.langs ? (q.codes[lang]||q.codes[q.langs[0]]) : (q.code||'');
+  // Return plain unescaped code for the textarea editor
+  var raw = q.langs ? (q.codes[lang]||q.codes[q.langs[0]]) : (q.code||'');
+  // If it's Java and missing a class wrapper, wrap it
+  if(lang==='Java' && raw.indexOf('class ')<0){
+    raw = 'public class Main {\n    public static void main(String[] args) {\n        '+raw.split('\n').join('\n        ')+'\n    }\n}';
+  }
+  return raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 }
 
 function runCode(qid, lang){
@@ -648,7 +661,9 @@ function runCode(qid, lang){
   if(!ta||!out) return;
   var code=ta.value;
   var pl=PISTON_LANG[lang]||PISTON_LANG.Python;
-  out.className='run-output running'; out.textContent='⏳ Compiling and running...';
+
+  out.className='run-output running';
+  out.textContent='⏳ Compiling and running...';
   btn.disabled=true;
 
   fetch('https://emkc.org/api/v2/piston/execute',{
@@ -657,27 +672,49 @@ function runCode(qid, lang){
     body:JSON.stringify({
       language: pl.language,
       version:  pl.version,
-      files:[{name:'main',content:code}],
-      stdin:''
+      files:[{filename: pl.ext, content: code}]
     })
   })
-  .then(function(r){return r.json();})
+  .then(function(r){
+    if(!r.ok) throw new Error('API error: '+r.status);
+    return r.json();
+  })
   .then(function(data){
     btn.disabled=false;
-    var run=data.run||{};
-    var output=((run.stdout||'')+(run.stderr||'')).trim()||'(no output)';
+    // Piston returns compile + run stages
+    var compile = data.compile || {};
+    var run     = data.run     || {};
 
+    // Compile error (C/Java)
+    if(compile.code !== undefined && compile.code !== 0){
+      out.className='run-output err';
+      out.textContent='Compile error:\n'+(compile.stderr||compile.stdout||'unknown error').trim();
+      return;
+    }
+
+    var stdout = (run.stdout||'').trim();
+    var stderr = (run.stderr||'').trim();
+
+    // Runtime error
+    if(run.code !== 0 && !stdout){
+      out.className='run-output err';
+      out.textContent='Runtime error:\n'+(stderr||'unknown error');
+      return;
+    }
+
+    var output = stdout || stderr || '(no output)';
+
+    // Check against expected output (first line match is enough)
     var q=QS.find(function(x){return x.id===qid;});
     var expected=(q?q.goodOut:'').trim();
     var firstExpected=expected.split('\n')[0].trim();
-    var passed=firstExpected && output.indexOf(firstExpected)>=0;
+    // Clean expected — strip annotations like "(for Alice)" or "[valgrind...]"
+    firstExpected=firstExpected.replace(/\s*[\(\[].*$/,'').trim();
+    var passed = firstExpected.length>0 && output.toLowerCase().indexOf(firstExpected.toLowerCase())>=0;
 
-    if(run.code!==0 && !run.stdout){
-      out.className='run-output err';
-      out.textContent=output;
-    } else if(passed){
+    if(passed){
       out.className='run-output pass';
-      out.innerHTML='<div class="pass-banner">✓ Output matches expected!</div>'+escHtml(output);
+      out.innerHTML='<div class="pass-banner">✓ Correct! Output matches expected.</div>'+escHtml(output);
     } else {
       out.className='run-output ok';
       out.textContent=output;
@@ -686,7 +723,7 @@ function runCode(qid, lang){
   .catch(function(err){
     btn.disabled=false;
     out.className='run-output err';
-    out.textContent='Connection error: '+err.message;
+    out.textContent='Connection error: '+err.message+'\n\nMake sure you are online.';
   });
 }
 
