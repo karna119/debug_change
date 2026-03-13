@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debug Challenge</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--border:#1e2d45;
+  --accent:#00f5a0;--accent2:#00b8d9;--warn:#f5a623;--danger:#ff4757;
+  --text:#e8f0fe;--muted:#637089;
+  --py:#3b9eff;--java:#f5a623;--clang:#b87dff;
+  --r1c:#00c97a;--r2c:#f5a623;--r3c:#ff4757;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh}
+.page{display:none;min-height:100vh}
+.page.show{display:flex;flex-direction:column}
+#pg-landing{align-items:center;justify-content:center;background:radial-gradient(ellipse at 30% 20%,#0d2040,var(--bg) 65%)}
+.land-box{width:440px;max-width:96vw;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:2.5rem;position:relative}
+.land-box::before{content:'';position:absolute;inset:-1px;border-radius:19px;background:linear-gradient(135deg,var(--accent),transparent 50%,var(--accent2));z-index:-1;opacity:.45}
+.logo{text-align:center;margin-bottom:2rem}
+.logo-icon{width:58px;height:58px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;color:var(--bg);margin-bottom:12px}
+.logo h1{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.logo p{font-size:13px;color:var(--muted);margin-top:4px}
+.role-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1.5rem}
+.role-card{padding:14px 8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
+.role-card .rci{font-size:22px;display:block;margin-bottom:6px}
+.role-card.sel{background:var(--bg3);color:var(--text);border-color:var(--accent)}
+.role-card:hover:not(.sel){background:var(--bg3);color:var(--text)}
+.fld{margin-bottom:1rem}
+.fld label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.fld input{width:100%;padding:11px 14px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Syne',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.fld input:focus{border-color:var(--accent)}
+.fld input::placeholder{color:var(--muted)}
+.btn-main{width:100%;padding:13px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:var(--bg);font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s;margin-top:.5rem}
+.btn-main:hover{opacity:.88}
+.errmsg{color:var(--danger);font-size:12px;margin-top:8px;text-align:center;display:none}
+.hint-txt{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+.hint-txt code{background:var(--bg3);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;color:var(--accent)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 1.5rem;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:50;flex-shrink:0}
+.tb-logo{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+.tb-logo em{color:var(--accent);font-style:normal}
+.tb-right{display:flex;align-items:center;gap:8px}
+.btn-s{padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+.btn-s.red{border-color:var(--danger);color:var(--danger)}
+.btn-s.red:hover{background:var(--danger);color:#fff}
+.btn-s.grn{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:700}
+.btn-s.grn:hover{opacity:.85;color:var(--bg)}
+.rbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.04em}
+.rb1{background:#0d2d1e;color:var(--r1c)}.rb2{background:#2d1f08;color:var(--r2c)}.rb3{background:#2d0f12;color:var(--r3c)}
+.bpy{background:#0d2a4a;color:var(--py)}.bjava{background:#2d1f08;color:var(--java)}.bc{background:#1e1033;color:var(--clang)}
+#pg-admin{flex-direction:column}
+.a-body{display:grid;grid-template-columns:260px 1fr 290px;flex:1;overflow:hidden}
+.sidebar{border-right:1px solid var(--border);padding:1.25rem;overflow-y:auto}
+.sec-head{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);font-size:12px;font-weight:700;margin-bottom:6px}
+.dot8{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-sec{margin-bottom:1.5rem}
+.qi{padding:7px 10px;border-radius:7px;cursor:pointer;font-size:11.5px;color:var(--muted);transition:all .15s;display:flex;align-items:center;gap:7px;margin-bottom:2px;border:1px solid transparent}
+.qi:hover{background:var(--bg3);color:var(--text)}
+.qi.act{background:var(--bg3);color:var(--accent);border-color:var(--accent)}
+.qi.done{color:var(--r1c)}.qi.done::after{content:'checkmark';content:'✓';margin-left:auto;font-size:10px}
+.ldot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.main-area{padding:1.5rem;overflow-y:auto}
+.q-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+.q-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.75rem}
+.q-meta{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.q-title{font-size:20px;font-weight:800}
+.q-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.timer-wrap{text-align:center;min-width:130px}
+.timer-big{font-family:'JetBrains Mono',monospace;font-size:46px;font-weight:800;line-height:1;letter-spacing:-2px}
+.timer-big.twarn{color:var(--warn)}.timer-big.tdanger{color:var(--danger);animation:blink .5s infinite alternate}
+@keyframes blink{to{opacity:.4}}
+.timer-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.1em}
+.timer-btns{display:flex;gap:5px;margin-top:8px;justify-content:center}
+.funny{font-size:12.5px;color:var(--muted);font-style:italic;margin-bottom:1rem;padding:9px 13px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--border)}
+.sec-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;font-weight:700}
+.code-pre{background:#060d1a;border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;margin-bottom:1rem;white-space:pre;overflow-x:auto}
+.bl{color:var(--danger)}
+.out-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+.out-box{padding:9px 13px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;white-space:pre-wrap}
+.out-bad{background:#1a0a0d;border:1px solid #5a1a22;color:#ff8a96}
+.out-ok{background:#0a1a10;border:1px solid #1a5a30;color:#6effa0}
+.ans-box{padding:12px 16px;border-radius:10px;background:#0a1a10;border:1px solid #1a5a30;font-size:13px;line-height:1.6;color:#a0ffbf;display:none}
+.ans-box.vis{display:block}
+.lsw{display:flex;gap:6px;margin-bottom:10px}
+.lbtn{padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;transition:all .15s}
+.lbtn.act{border-color:var(--accent2);color:var(--accent2);background:#061a24}
+.rp{border-left:1px solid var(--border);padding:1.25rem;overflow-y:auto}
+.rp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.rp-head h3{font-size:14px;font-weight:700}
+.team-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;margin-bottom:6px;border:1px solid var(--border);background:var(--bg2)}
+.t-rank{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--muted);min-width:18px}
+.t-rank.gold{color:#ffd700}.t-rank.silver{color:#c0c0c0}.t-rank.bronze{color:#cd7f32}
+.t-info{flex:1;min-width:0}
+.t-name{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-lead{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-score{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;color:var(--accent)}
+.sc-btn{padding:3px 9px;border-radius:5px;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}
+.sc-btn.p{background:#0a1a10;color:var(--r1c)}.sc-btn.m{background:#1a0a0d;color:var(--danger)}
+.sc-btn:hover{opacity:.75}
+#pg-team{flex-direction:column}
+.t-topbar{padding:11px 1.5rem;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.t-body{flex:1;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto}
+.wait-screen{text-align:center}
+.wait-bug{font-size:72px;margin-bottom:1.5rem;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.wait-screen h2{font-size:26px;font-weight:800;margin-bottom:8px}
+.wait-screen p{color:var(--muted);font-size:14px}
+.t-mini-board{padding:.75rem 1.5rem;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.mini-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.mini-chip{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);white-space:nowrap;font-size:12px}
+.mini-chip.me{border-color:var(--accent);color:var(--accent)}
+.mini-sc{font-family:'JetBrains Mono',monospace;font-weight:800}
+#pg-board{align-items:center;padding:2rem;background:radial-gradient(ellipse at 70% 0%,#0d2040,var(--bg) 60%)}
+.board-title{font-size:34px;font-weight:800;text-align:center;margin-bottom:4px}
+.board-title em{color:var(--accent);font-style:normal}
+.board-sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:2rem}
+.full-board{width:100%;max-width:600px}
+.fb-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;margin-bottom:9px;border:1px solid var(--border);background:var(--bg2)}
+.fb-row:nth-child(1){border-color:#ffd700;background:#1a1500}
+.fb-row:nth-child(2){border-color:#c0c0c0;background:#141414}
+.fb-row:nth-child(3){border-color:#cd7f32;background:#140d06}
+.fb-rank{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;min-width:36px}
+.fb-info{flex:1}
+.fb-name{font-size:17px;font-weight:700}
+.fb-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.fb-score{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;color:var(--accent)}
+.rbs{display:flex;gap:5px;margin-top:4px}
+.rb-pill{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;max-width:460px;width:95vw}
+.modal h3{font-size:17px;font-weight:800;margin-bottom:.75rem}
+.modal p{color:var(--muted);font-size:13px;margin-bottom:1.25rem;line-height:1.6}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="pg-landing" class="page show">
+  <div class="land-box">
+    <div id="fb-setup-banner" style="display:none;background:#2d1500;border:1px solid var(--warn);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--warn);margin-bottom:1.25rem;line-height:1.6">
+      ⚠️ <strong>Firebase not configured.</strong> Open the HTML file, find the <code style="background:rgba(255,255,255,.1);padding:1px 5px;border-radius:3px">firebaseConfig</code> block near the bottom, and replace the placeholder values with your project's config.
+      <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent2);margin-left:4px">Open Firebase Console →</a>
+    </div>
+    <div class="logo">
+      <div class="logo-icon">&gt;_</div>
+      <h1>Debug Challenge</h1>
+      <p>Select your role to continue</p>
+    </div>
+    <div class="role-grid">
+      <button class="role-card sel" id="rc-team" onclick="pickRole('team')"><span class="rci">&#128101;</span>Team</button>
+      <button class="role-card" id="rc-admin" onclick="pickRole('admin')"><span class="rci">&#127918;</span>Host</button>
+      <button class="role-card" id="rc-board" onclick="pickRole('board')"><span class="rci">&#127942;</span>Leaderboard</button>
+    </div>
+    <div id="f-team">
+      <div class="fld"><label>Team Name</label><input id="in-tname" placeholder="e.g. Runtime Terror" /></div>
+      <div class="fld"><label>Team Lead ID</label><input id="in-tid" placeholder="Student / Employee ID" /></div>
+      <div class="fld"><label>Team Lead Email</label><input id="in-temail" type="email" placeholder="teamlead@college.edu" /></div>
+      <p class="hint-txt">New team? You will be registered automatically on first login.</p>
+    </div>
+    <div id="f-admin" style="display:none">
+      <div class="fld"><label>Host Password</label><input id="in-apass" type="password" placeholder="Enter host password" /></div>
+    </div>
+    <div id="f-board" style="display:none">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">Opens the public live leaderboard. No password needed.</p>
+    </div>
+    <button class="btn-main" onclick="doLogin()">Enter &#8594;</button>
+    <div class="errmsg" id="errmsg">Please check your details and try again.</div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="pg-admin" class="page">
+  <div class="topbar">
+    <div class="tb-logo">&gt;_&nbsp;<em>Debug Challenge</em>&nbsp;<span style="color:var(--muted);font-size:12px;font-weight:400">Host Panel</span></div>
+    <div class="tb-right">
+      <span id="fb-dot" title="Firebase sync" style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px"><span id="fb-dot-circle" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted)"></span>DB</span>
+      <span id="a-rbadge" class="rbadge rb1">Round 1</span>
+      <button class="btn-s" onclick="openOv('ov-addteam')">+ Team</button>
+      <button class="btn-s" onclick="openOv('ov-reset')">Reset Scores</button>
+      <button class="btn-s red" onclick="goLogout()">Logout</button>
+    </div>
+  </div>
+  <div class="a-body">
+    <div class="sidebar">
+      <div class="sidebar-sec">
+        <div class="sec-head"><div class="dot8" style="background:var(--r1c)"></div>Round 1 <span style="margin-left:auto;font-size:10px;color:var(--muted)">20 min</span></div>
+        <div id="sl-r1"></div>
+      </div>
+      <div class="sidebar-sec">
+        <div class="sec-head"><div class="dot8" style="background:var(--r2c)"></div>Round 2 <span style="margin-left:auto;font-size:10px;color:var(--muted)">5 min</span></div>
+        <div id="sl-r2"></div>
+      </div>
+      <div class="sidebar-sec">
+        <div class="sec-head"><div class="dot8" style="background:var(--r3c)"></div>Round 3 <span style="margin-left:auto;font-size:10px;color:var(--muted)">Finals</span></div>
+        <div id="sl-r3"></div>
+      </div>
+    </div>
+    <div class="main-area">
+      <div id="qpanel" class="q-card">
+        <div style="text-align:center;padding:3rem;color:var(--muted)">
+          <div style="font-size:36px;margin-bottom:1rem">&#8592;</div>
+          <div>Select a question from the sidebar to begin</div>
+        </div>
+      </div>
+    </div>
+    <div class="rp">
+      <div class="rp-head">
+        <h3>Leaderboard</h3>
+        <span style="font-size:11px;color:var(--muted)" id="tc-label">0 teams</span>
+      </div>
+      <div id="a-board"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM -->
+<div id="pg-team" class="page">
+  <div class="t-topbar">
+    <div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Team</div>
+      <div style="font-size:15px;font-weight:700" id="td-name">-</div>
+      <div style="font-size:11px;color:var(--muted)" id="td-lead">-</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em" id="td-rlbl">Waiting</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;color:var(--accent)" id="td-timer">--:--</div>
+    </div>
+    <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Score</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:var(--accent)" id="td-score">0</div>
+      </div>
+      <button class="btn-s red" onclick="goLogout()">Logout</button>
+    </div>
+  </div>
+  <div class="t-body" id="t-body">
+    <div class="wait-screen">
+      <div class="wait-bug">&#128027;</div>
+      <h2>Waiting for the host...</h2>
+      <p>Your question will appear here when the round starts.</p>
+    </div>
+  </div>
+  <div class="t-mini-board">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Live standings</div>
+    <div class="mini-row" id="t-mini"></div>
+  </div>
+</div>
+
+<!-- PUBLIC BOARD -->
+<div id="pg-board" class="page">
+  <div class="board-title">Debug <em>Challenge</em></div>
+  <div class="board-sub" id="board-sub">Live Leaderboard</div>
+  <div class="full-board" id="full-board"></div>
+  <button class="btn-s" onclick="goLogout()" style="margin-top:1.5rem">&#8592; Back</button>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="ov-reset">
+  <div class="modal">
+    <h3>Reset all scores?</h3>
+    <p>This will zero every team's score and round totals. Cannot be undone.</p>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeOv('ov-reset')">Cancel</button>
+      <button class="btn-s red" onclick="doReset()">Reset</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="ov-addteam">
+  <div class="modal">
+    <h3>Add Team Manually</h3>
+    <div class="fld"><label>Team Name</label><input id="at-name" placeholder="Team Name" /></div>
+    <div class="fld"><label>Lead ID</label><input id="at-id" placeholder="Student / Employee ID" /></div>
+    <div class="fld"><label>Lead Email</label><input id="at-email" type="email" placeholder="email@college.edu" /></div>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeOv('ov-addteam')">Cancel</button>
+      <button class="btn-s grn" onclick="addTeamManual()">Add Team</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="ov-confirm-reg">
+  <div class="modal">
+    <h3>Register New Team?</h3>
+    <p id="reg-msg">Team not found. Register and enter?</p>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeOv('ov-confirm-reg')">Cancel</button>
+      <button class="btn-s grn" onclick="confirmReg()">Register &amp; Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat — works when opening file directly) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+
+// ─────────────────────────────────────────────
+//  🔥 PASTE YOUR FIREBASE CONFIG HERE
+//  1. Go to https://console.firebase.google.com
+//  2. Create a project → Add Web App
+//  3. Copy the firebaseConfig object below
+//  4. In Firebase Console → Realtime Database → Rules, set:
+//     { "rules": { ".read": true, ".write": true } }  (for the event)
+// ─────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCUzT5Yjpgdx9crbfQeSHlFF8O_pzNNURU",
+  authDomain: "bytexl-16e61.firebaseapp.com",
+  databaseURL: "https://bytexl-16e61-default-rtdb.firebaseio.com",
+  projectId: "bytexl-16e61",
+  storageBucket: "bytexl-16e61.firebasestorage.app",
+  messagingSenderId: "228464294329",
+  appId: "1:228464294329:web:5517f6ed1a3fe8c56bde68"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const db  = firebase.database();
+const teamsRef = db.ref('teams');
+
+// ─────────────────────────────────────────────
+//  App state
+// ─────────────────────────────────────────────
+var ADMIN_PASS = 'admin123';
+var teams = [];           // local mirror, kept in sync by onValue listener
+var currentTeam = null;
+var currentRole = 'team';
+var currentQ = null;
+var currentLang = 'Python';
+var doneSet = {};
+var timerSecs = 0;
+var timerRunning = false;
+var timerIv = null;
+var pendingReg = null;
+
+// ─────────────────────────────────────────────
+//  Real-time listener — syncs ALL devices
+// ─────────────────────────────────────────────
+teamsRef.on('value', function(snapshot) {
+  var data = snapshot.val() || {};
+  teams = Object.values(data).filter(function(t){ return t && t.name; });
+  console.log('[Firebase] teams updated:', teams.length, teams.map(function(t){return t.name;}));
+  // Show a visible error banner if DB is empty and we've been connected a while
+  var banner = document.getElementById('fb-setup-banner');
+  if(banner) banner.style.display='none';
+  // Keep currentTeam reference alive after remote update
+  if (currentTeam) {
+    var updated = teams.find(function(t){ return t.name === currentTeam.name; });
+    if (updated) {
+      currentTeam = updated;
+      var el = document.getElementById('td-score');
+      if (el) el.textContent = updated.score;
+    }
+  }
+  renderAdminBoard();
+  renderBoard();
+  renderMini();
+  updateTC();
+}, function(error) {
+  console.error('[Firebase] READ ERROR:', error.code, error.message);
+  var banner = document.getElementById('fb-setup-banner');
+  if(banner){
+    banner.style.display='block';
+    banner.innerHTML='🔴 <strong>Firebase error: ' + error.code + '</strong> — Check Realtime Database Rules: set .read and .write to true.';
+  }
+});
+
+// Connection state indicator
+db.ref('.info/connected').on('value', function(snap){
+  var dot = document.getElementById('fb-dot-circle');
+  if(dot) dot.style.background = snap.val() ? 'var(--accent)' : 'var(--danger)';
+});
+
+var LANGC = {Python:'var(--py)',Java:'var(--java)',C:'var(--clang)'};
+
+var QS = [
+  {id:'r1q1',round:1,num:'Q1',title:'The Off-By-One Criminal',lang:'Python',
+   funny:"This loop skipped the very first item. Blamed it on Monday morning.",
+   code:"def sum_list(nums):\n    total = 0\n    for i in range(1, len(nums)):  # BUG\n        total += nums[i]\n    return total\nprint(sum_list([10, 20, 30]))",
+   bl:[2],bugOut:'50',goodOut:'60',
+   ans:'range(1,...) skips index 0. Fix: range(0, len(nums)) or just: for n in nums',pts:10},
+  {id:'r1q2',round:1,num:'Q2',title:'The Semicolon Saboteur',lang:'Java',
+   funny:"The loop runs perfectly. It just does nothing inside. The body is a lie.",
+   code:"int sum = 0;\nfor (int i = 1; i <= 5; i++);  // BUG\n    sum += i;\nSystem.out.println(sum);",
+   bl:[1],bugOut:"Compile Error: cannot find symbol 'i'",goodOut:'15',
+   ans:'Semicolon after for() ends the loop immediately. Remove the ; after the closing parenthesis.',pts:10},
+  {id:'r1q3',round:1,num:'Q3',title:'The Pointer to Nowhere',lang:'C',
+   funny:"They forgot one star. The original value never changed. 45 minutes of staring.",
+   code:"void double_it(int n) { n = n * 2; }\nint main() {\n    int x = 5;\n    double_it(x);\n    printf(\"%d\\n\", x);  // BUG\n}",
+   bl:[4],bugOut:'5',goodOut:'10',
+   ans:'C passes by value. Fix: void double_it(int *n){*n=*n*2;} and call double_it(&x).',pts:10},
+  {id:'r1q4',round:1,num:'Q4',title:'The String Comparison Disaster',lang:'Java',
+   funny:"Two identical strings walked in. Java said they were not equal.",
+   code:"String a = new String(\"hello\");\nString b = new String(\"hello\");\nif (a == b)  // BUG\n    System.out.println(\"Same!\");\nelse System.out.println(\"Different!\");",
+   bl:[2],bugOut:'Different!',goodOut:'Same!',
+   ans:'== compares references not content. Fix: a.equals(b)',pts:10},
+  {id:'r1q5',round:1,num:'Q5',title:'The Ghosting Function',lang:'Python',
+   funny:"Did all the math. Returned None. Left without a word.",
+   code:"def multiply(a, b):\n    result = a * b\n\nanswer = multiply(6, 7)\nprint(answer)  # prints None",
+   bl:[4],bugOut:'None',goodOut:'42',
+   ans:'Missing return statement. Add: return result',pts:10},
+  {id:'r1q6',round:1,num:'Q6',title:'The Integer Division Trap',lang:'C',
+   funny:"They asked for 3.5. Got 3.0. The fractions filed a complaint.",
+   code:"int a = 7, b = 2;\nfloat result = a / b;  // BUG\nprintf(\"%.1f\\n\", result);",
+   bl:[1],bugOut:'3.0',goodOut:'3.5',
+   ans:'int/int = integer division before float assignment. Fix: (float)a / b',pts:10},
+  {id:'r1q7',round:1,num:'Q7',title:'The Null Revenge',lang:'Java',
+   funny:"Declared. Never initialized. Took its revenge at runtime.",
+   code:"String name;\nSystem.out.println(name.length());  // BUG",
+   bl:[1],bugOut:'Error: variable name might not have been initialized',goodOut:'5  (for "Alice")',
+   ans:'Uninitialized variable. Fix: String name = "Alice"; before using it.',pts:10},
+  {id:'r1q8',round:1,num:'Q8',title:'The Uninvited Guest',lang:'C',
+   funny:"Array had 5 slots. Loop visited 6. Slot 6 belonged to someone else.",
+   code:"int arr[5] = {1,2,3,4,5};\nfor(int i=0; i<=5; i++)  // BUG\n    printf(\"%d \", arr[i]);",
+   bl:[1],bugOut:'1 2 3 4 5 [garbage or crash]',goodOut:'1 2 3 4 5',
+   ans:'i<=5 accesses arr[5] out of bounds. Fix: i<5',pts:10},
+  {id:'r1q9',round:1,num:'Q9',title:'The Concatenation Catastrophe',lang:'Python',
+   funny:"User typed 3 then 4. Got 34. Filed a bug report. Was completely right.",
+   code:"a = input(\"First: \")   # user enters 3\nb = input(\"Second: \")  # user enters 4\nprint(\"Sum:\", a + b)   # BUG",
+   bl:[2],bugOut:'Sum: 34',goodOut:'Sum: 7',
+   ans:'input() returns strings. + concatenates. Fix: int(a) + int(b)',pts:10},
+  {id:'r1q10',round:1,num:'Q10',title:'The Static Context Crime',lang:'Java',
+   funny:"Called a non-static method from static main. Java said absolutely not.",
+   code:"public class Hello {\n    public void greet() {\n        System.out.println(\"Hello!\");\n    }\n    public static void main(String[] args) {\n        greet();  // BUG\n    }\n}",
+   bl:[5],bugOut:'Error: non-static method cannot be referenced from static context',goodOut:'Hello!',
+   ans:'Fix: Hello h = new Hello(); h.greet(); or make greet() static.',pts:10},
+  {id:'r2q1',round:2,num:'K1',title:'The Infinite Loop',langs:['Python','Java','C'],
+   funny:"Counter goes 0,3,6,9,12 — never hits 10. Still running somewhere.",
+   codes:{Python:"count = 0\nwhile count != 10:  # BUG\n    print(count)\n    count += 3",Java:"int count = 0;\nwhile (count != 10) {  // BUG\n    System.out.println(count);\n    count += 3;\n}",C:"int count = 0;\nwhile (count != 10) {  // BUG\n    printf(\"%d\\n\", count);\n    count += 3;\n}"},
+   bls:{Python:[1],Java:[1],C:[1]},bugOut:"0\n3\n6\n9\n12\n... [never stops]",goodOut:"0\n3\n6\n9",
+   ans:"count skips 10 (goes 9 then 12). Fix: change != 10 to < 10.",pts:20},
+  {id:'r2q2',round:2,num:'K2',title:'The Assignment in Condition',langs:['Python','Java','C'],
+   funny:"They wanted to compare. They assigned instead. Three flavours of disaster.",
+   codes:{Python:"x = 5\nif x = 10:  # BUG - SyntaxError\n    print(\"Ten!\")",Java:"boolean flag = false;\nif (flag = true) {  // BUG - always true!\n    System.out.println(\"Always true!\");\n}",C:"int x = 5;\nif (x = 0) {  // BUG - assigns 0!\n    printf(\"Zero!\\n\");\n} else printf(\"Not zero!\\n\");\nprintf(\"x is now: %d\\n\", x);"},
+   bls:{Python:[1],Java:[1],C:[1]},bugOut:"Python: SyntaxError\nJava: Always true!\nC: Not zero!  x is now: 0",goodOut:"Python: SyntaxError (expected)\nJava: (nothing)\nC: Zero!  x stays 5",
+   ans:"= is assignment, == is comparison. Python refuses; Java silent bug; C changes x.",pts:20},
+  {id:'r2q3',round:2,num:'K3',title:'The Wrong Division Type',langs:['Python','Java','C'],
+   funny:"7 divided by 2 should be 3.5. All three round it down. Math cries.",
+   codes:{Python:"a, b = 7, 2\nresult = a // b  # BUG\nprint(result)",Java:"int a = 7, b = 2;\ndouble result = a / b;  // BUG\nSystem.out.println(result);",C:"int a = 7, b = 2;\nfloat result = a / b;  // BUG\nprintf(\"%.1f\\n\", result);"},
+   bls:{Python:[1],Java:[1],C:[1]},bugOut:"3 (Python)  3.0 (Java, C)",goodOut:"3.5 (all three)",
+   ans:"Python: use / not //. Java: (double)a/b. C: (float)a/b. Int/int = integer result.",pts:20},
+  {id:'r2q4',round:2,num:'K4',title:'The Missing Break',langs:['Python','Java','C'],
+   funny:"Found Tuesday. Kept going. Printed Wednesday and ??? for no reason.",
+   codes:{Python:"day = 2\nfor i in range(1, 5):\n    if i == day:\n        print(\"Found day\", i)\n    # missing: break  -- BUG\n    print(\"Still checking\", i)",Java:"int day = 2;\nswitch(day) {\n    case 1: System.out.println(\"Mon\");\n    case 2: System.out.println(\"Tue\");  // BUG\n    case 3: System.out.println(\"Wed\");\n    default: System.out.println(\"???\");\n}",C:"int day = 2;\nswitch(day) {\n    case 1: printf(\"Mon\\n\");\n    case 2: printf(\"Tue\\n\");  // BUG\n    case 3: printf(\"Wed\\n\");\n    default: printf(\"???\\n\");\n}"},
+   bls:{Python:[4],Java:[3],C:[3]},bugOut:"Python: Found day 2 + loop continues\nJava/C: Tue\nWed\n???",goodOut:"Python: Found day 2\nJava/C: Tue",
+   ans:"Java/C: switch fallthrough without break. Python: missing break keeps looping. Add break after match.",pts:20},
+  {id:'r2q5',round:2,num:'K5',title:'The Scope Escape',langs:['Python','Java','C'],
+   funny:"Variable declared inside. Used outside. Three languages, three ways to say no.",
+   codes:{Python:"def compute():\n    result = 42\ncompute()\nprint(result)  # BUG",Java:"if (true) {\n    int result = 42;\n}\nSystem.out.println(result);  // BUG",C:"{\n    int result = 42;\n}\nprintf(\"%d\\n\", result);  // BUG"},
+   bls:{Python:[3],Java:[3],C:[3]},bugOut:"Python: NameError\nJava: error: cannot find symbol\nC: error: undeclared",goodOut:"42 (all three)",
+   ans:"All three: variable out of scope. Fix: declare outside block, assign inside, use outside.",pts:20},
+  {id:'r3q1',round:3,num:'F1',title:'The Mutable Default Trap',lang:'Python',
+   funny:"The shopping cart remembered everyone's items. Like a very nosy cashier.",
+   code:"def add_item(item, cart=[]):  # BUG\n    cart.append(item)\n    return cart\nprint(add_item(\"apple\"))\nprint(add_item(\"banana\"))",
+   bl:[0],bugOut:"['apple']\n['apple', 'banana']",goodOut:"['apple']\n['banana']",
+   ans:"Default [] created once at definition, shared across all calls. Fix: def add_item(item, cart=None): if cart is None: cart = []",pts:30},
+  {id:'r3q2',round:3,num:'F2',title:'The Memory Leak Ghost',lang:'C',
+   funny:"malloc'd. Used. Never freed. Still out there somewhere eating RAM.",
+   code:"void create_array() {\n    int *arr = malloc(10 * sizeof(int));\n    for(int i=0; i<10; i++) arr[i] = i;\n}  // BUG - never freed!\nint main() {\n    for(int i=0; i<1000; i++) create_array();\n    printf(\"Done\\n\");\n}",
+   bl:[3],bugOut:'Done\n[valgrind: 40,000 bytes leaked in 1,000 blocks]',goodOut:'Done\n[0 bytes leaked]',
+   ans:'malloc without free = memory leak. Fix: add free(arr); before the function returns.',pts:30},
+  {id:'r3q3',round:3,num:'F3',title:'The Integer Overflow Disaster',lang:'Java',
+   funny:"100,000 times 100,000 equals 10 billion. int cannot hold it. It wrapped.",
+   code:"int a = 100000, b = 100000;\nint result = a * b;  // BUG\nSystem.out.println(result);",
+   bl:[1],bugOut:'1410065408',goodOut:'10000000000',
+   ans:'int max is ~2.1 billion. 10 billion overflows and wraps. Fix: long result = (long)a * b;',pts:30},
+  {id:'r3q4',round:3,num:'F4',title:'The Late-Binding Lambda',lang:'Python',
+   funny:"Five lambdas promised to remember five numbers. All remembered the last one.",
+   code:"funcs = []\nfor i in range(5):\n    funcs.append(lambda: i)  # BUG\nprint([f() for f in funcs])",
+   bl:[2],bugOut:'[4, 4, 4, 4, 4]',goodOut:'[0, 1, 2, 3, 4]',
+   ans:"Lambdas capture i by reference and all see i=4 after the loop. Fix: lambda x=i: x",pts:30},
+  {id:'r3q5',round:3,num:'F5',title:'The Dangling Pointer',lang:'C',
+   funny:"Memory freed. Pointer still used. The demon was summoned.",
+   code:"int *ptr = malloc(sizeof(int));\n*ptr = 99;\nfree(ptr);\nprintf(\"%d\\n\", *ptr);  // BUG",
+   bl:[3],bugOut:'99 (or garbage, or crash - UNDEFINED BEHAVIOUR)',goodOut:'[never use freed memory - set ptr = NULL after free]',
+   ans:'Accessing freed memory = undefined behaviour. Fix: after free(ptr), set ptr = NULL and check before use.',pts:30}
+];
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showPage(id){ document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('show'); }); document.getElementById(id).classList.add('show'); }
+function openOv(id){ document.getElementById(id).classList.add('open'); }
+function closeOv(id){ document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.overlay').forEach(function(el){
+  el.addEventListener('click',function(e){ if(e.target===el) el.classList.remove('open'); });
+});
+
+function pickRole(role){
+  currentRole=role;
+  ['team','admin','board'].forEach(function(r){
+    document.getElementById('rc-'+r).classList.toggle('sel',r===role);
+    document.getElementById('f-'+r).style.display=r===role?'':'none';
+  });
+  document.getElementById('errmsg').style.display='none';
+}
+
+function doLogin(){
+  var err=document.getElementById('errmsg');
+  err.style.display='none';
+  if(currentRole==='board'){ showPage('pg-board'); renderBoard(); return; }
+  if(currentRole==='admin'){
+    if(document.getElementById('in-apass').value!==ADMIN_PASS){ err.textContent='Wrong password.'; err.style.display='block'; return; }
+    showPage('pg-admin'); buildSidebar(); renderAdminBoard(); renderBoard(); return;
+  }
+  var tname=document.getElementById('in-tname').value.trim();
+  var tid=document.getElementById('in-tid').value.trim();
+  var temail=document.getElementById('in-temail').value.trim();
+  if(!tname||!tid||!temail){ err.textContent='Please fill in all three fields.'; err.style.display='block'; return; }
+  if(temail.indexOf('@')<0){ err.textContent='Please enter a valid email address.'; err.style.display='block'; return; }
+  var found=null;
+  for(var i=0;i<teams.length;i++){ if(teams[i].name.toLowerCase()===tname.toLowerCase()){ found=teams[i]; break; } }
+  if(found){
+    if(found.leadId!==tid||found.email.toLowerCase()!==temail.toLowerCase()){ err.textContent='Team exists but lead ID or email does not match.'; err.style.display='block'; return; }
+    enterTeam(found);
+  } else {
+    pendingReg={name:tname,leadId:tid,email:temail};
+    document.getElementById('reg-msg').textContent='"'+tname+'" is not registered yet. Create this team and enter?';
+    openOv('ov-confirm-reg');
+  }
+}
+
+function confirmReg(){
+  if(!pendingReg) return;
+  var t={name:pendingReg.name,leadId:pendingReg.leadId,email:pendingReg.email,score:0,r1:0,r2:0,r3:0};
+  var key=pendingReg.name.replace(/[.#$\[\]]/g,'_');
+  pendingReg=null;
+  closeOv('ov-confirm-reg');
+  db.ref('teams/'+key).set(t).then(function(){ enterTeam(t); });
+}
+
+function enterTeam(t){
+  currentTeam=t;
+  document.getElementById('td-name').textContent=t.name;
+  document.getElementById('td-lead').textContent='Lead: '+t.leadId+' · '+t.email;
+  document.getElementById('td-score').textContent=t.score;
+  renderMini(); showPage('pg-team');
+}
+
+function goLogout(){
+  currentTeam=null; currentQ=null;
+  clearInterval(timerIv); timerRunning=false;
+  ['in-tname','in-tid','in-temail','in-apass'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  showPage('pg-landing'); pickRole('team');
+}
+
+function buildSidebar(){
+  [1,2,3].forEach(function(r){
+    var el=document.getElementById('sl-r'+r); el.innerHTML='';
+    QS.filter(function(q){ return q.round===r; }).forEach(function(q){
+      var lang=q.lang||(q.langs&&q.langs[0])||'Python';
+      var d=document.createElement('div');
+      d.className='qi'+(doneSet[q.id]?' done':''); d.id='qi-'+q.id;
+      d.onclick=function(){ loadQ(q); };
+      d.innerHTML='<div class="ldot" style="background:'+LANGC[lang]+'"></div><span>'+q.num+'. '+esc(q.title)+'</span>';
+      el.appendChild(d);
+    });
+  });
+}
+
+function loadQ(q){
+  currentQ=q; currentLang=q.lang||(q.langs&&q.langs[0])||'Python';
+  document.querySelectorAll('.qi').forEach(function(i){ i.classList.remove('act'); });
+  var el=document.getElementById('qi-'+q.id); if(el) el.classList.add('act');
+  setTimer((q.round===1?20:q.round===2?5:10)*60);
+  renderQ(q);
+  var b=document.getElementById('a-rbadge');
+  b.textContent=['','Round 1','Round 2','Round 3'][q.round];
+  b.className='rbadge '+['','rb1','rb2','rb3'][q.round];
+}
+
+function buildCode(code,bl){
+  return (code||'').split('\n').map(function(line,i){
+    var e=esc(line); return (bl||[]).indexOf(i)>=0?'<span class="bl">'+e+'</span>':e;
+  }).join('\n');
+}
+
+function renderQ(q){
+  var isM=!!q.langs;
+  var lh=isM?q.langs.map(function(l){ return '<span class="rbadge b'+l.toLowerCase()+'">'+l+'</span>'; }).join(''):('<span class="rbadge b'+(q.lang||'').toLowerCase()+'">'+q.lang+'</span>');
+  var sw=isM?'<div class="lsw">'+q.langs.map(function(l){ return '<button class="lbtn'+(l===currentLang?' act':'')+'" onclick="switchLang(\''+l+'\')">'+l+'</button>'; }).join('')+'</div>':'';
+  var ch=isM?buildCode(q.codes[currentLang],(q.bls||{})[currentLang]||[]):buildCode(q.code,q.bl||[]);
+  document.getElementById('qpanel').innerHTML=
+    '<div class="q-card-top"><div>'
+    +'<div class="q-meta"><span class="rbadge '+['','rb1','rb2','rb3'][q.round]+'" style="margin-right:6px">Round '+q.round+'</span>'+q.num+' &middot; '+q.pts+' pts</div>'
+    +'<div class="q-title">'+esc(q.title)+'</div>'
+    +'<div class="q-badges">'+lh+'</div>'
+    +'</div>'
+    +'<div class="timer-wrap"><div class="timer-big" id="a-timer">--:--</div>'
+    +'<div class="timer-lbl">time left</div>'
+    +'<div class="timer-btns">'
+    +'<button class="btn-s" onclick="startTimer()">&#9654; Start</button>'
+    +'<button class="btn-s" onclick="pauseTimer()">&#9646;&#9646;</button>'
+    +'<button class="btn-s" onclick="resetTimer()">&#8635;</button>'
+    +'</div></div></div>'
+    +'<div class="funny">"'+esc(q.funny)+'"</div>'
+    +'<div class="sec-lbl">Buggy code</div>'+sw
+    +'<div class="code-pre" id="qcode">'+ch+'</div>'
+    +'<div class="out-grid">'
+    +'<div><div class="sec-lbl">Buggy output</div><div class="out-box out-bad">'+esc(q.bugOut)+'</div></div>'
+    +'<div><div class="sec-lbl">Expected output</div><div class="out-box out-ok">'+esc(q.goodOut)+'</div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<button class="btn-s grn" onclick="toggleAns()">Reveal Answer</button>'
+    +'<button class="btn-s" onclick="markDone()">Mark Done &#10003;</button>'
+    +'</div>'
+    +'<div class="ans-box" id="qans">'+esc(q.ans)+'</div>';
+  updateTD();
+}
+
+function switchLang(l){
+  if(!currentQ||!currentQ.langs) return;
+  currentLang=l;
+  document.querySelectorAll('#qpanel .lbtn').forEach(function(b){ b.classList.toggle('act',b.textContent===l); });
+  var el=document.getElementById('qcode'); if(el) el.innerHTML=buildCode(currentQ.codes[l],(currentQ.bls||{})[l]||[]);
+}
+
+function toggleAns(){ var b=document.getElementById('qans'); if(b) b.classList.toggle('vis'); }
+function markDone(){
+  if(!currentQ) return; doneSet[currentQ.id]=true;
+  var el=document.getElementById('qi-'+currentQ.id); if(el){ el.classList.add('done'); el.classList.remove('act'); }
+}
+
+function setTimer(s){ clearInterval(timerIv); timerRunning=false; timerSecs=s; updateTD(); }
+function startTimer(){
+  if(timerRunning) return; timerRunning=true;
+  timerIv=setInterval(function(){ if(timerSecs<=0){ clearInterval(timerIv); timerRunning=false; return; } timerSecs--; updateTD(); },1000);
+}
+function pauseTimer(){ clearInterval(timerIv); timerRunning=false; }
+function resetTimer(){ if(!currentQ) return; setTimer((currentQ.round===1?20:currentQ.round===2?5:10)*60); }
+function pad(n){ return n<10?'0'+n:''+n; }
+function updateTD(){
+  var m=Math.floor(timerSecs/60),s=timerSecs%60,txt=pad(m)+':'+pad(s);
+  var el=document.getElementById('a-timer');
+  if(el){ el.textContent=txt; el.className='timer-big'+(timerSecs<=30?' tdanger':timerSecs<=60?' twarn':''); }
+  var tel=document.getElementById('td-timer'); if(tel) tel.textContent=txt;
+}
+
+function adjustScore(name,delta){
+  var t=null; for(var i=0;i<teams.length;i++){ if(teams[i].name===name){ t=teams[i]; break; } }
+  if(!t) return;
+  var newScore=Math.max(0,t.score+delta);
+  var patch={score:newScore};
+  if(delta>0&&currentQ){ var k='r'+currentQ.round; patch[k]=(t[k]||0)+delta; }
+  var key=name.replace(/[.#$\[\]]/g,'_');
+  db.ref('teams/'+key).update(patch);
+}
+
+function renderAdminBoard(){
+  var el=document.getElementById('a-board');
+  if(!el) return;
+  var sorted=teams.slice().sort(function(a,b){ return b.score-a.score; });
+  var rk=['gold','silver','bronze'];
+  el.innerHTML=sorted.map(function(t,i){
+    return '<div class="team-row">'
+      +'<div class="t-rank '+(rk[i]||'')+'">'+( i+1)+'</div>'
+      +'<div class="t-info"><div class="t-name" title="'+esc(t.name)+'">'+esc(t.name)+'</div>'
+      +'<div class="t-lead">'+esc(t.leadId)+' &middot; '+esc(t.email)+'</div></div>'
+      +'<button class="sc-btn m" onclick="adjustScore(\''+esc(t.name)+'\',-10)">&minus;</button>'
+      +'<div class="t-score">'+t.score+'</div>'
+      +'<button class="sc-btn p" onclick="adjustScore(\''+esc(t.name)+'\',10)">+</button>'
+      +'</div>';
+  }).join('');
+  updateTC();
+}
+
+function updateTC(){ var el=document.getElementById('tc-label'); if(el) el.textContent=teams.length+' team'+(teams.length!==1?'s':''); }
+
+function doReset(){
+  var patch={};
+  teams.forEach(function(t){
+    var key=t.name.replace(/[.#$\[\]]/g,'_');
+    patch['teams/'+key+'/score']=0;
+    patch['teams/'+key+'/r1']=0;
+    patch['teams/'+key+'/r2']=0;
+    patch['teams/'+key+'/r3']=0;
+  });
+  db.ref('/').update(patch).then(function(){ closeOv('ov-reset'); });
+}
+
+function addTeamManual(){
+  var n=document.getElementById('at-name').value.trim();
+  var id=document.getElementById('at-id').value.trim();
+  var em=document.getElementById('at-email').value.trim();
+  if(!n||!id||!em) return;
+  var key=n.replace(/[.#$\[\]]/g,'_');
+  var t={name:n,leadId:id,email:em,score:0,r1:0,r2:0,r3:0};
+  document.getElementById('at-name').value=''; document.getElementById('at-id').value=''; document.getElementById('at-email').value='';
+  db.ref('teams/'+key).set(t).then(function(){ closeOv('ov-addteam'); });
+}
+
+function renderBoard(){
+  var el=document.getElementById('full-board'); if(!el) return;
+  var sorted=teams.slice().sort(function(a,b){ return b.score-a.score; });
+  var medals=['&#127945;','&#127946;','&#127947;'];
+  el.innerHTML=sorted.map(function(t,i){
+    return '<div class="fb-row">'
+      +'<div class="fb-rank">'+(i<3?medals[i]:i+1)+'</div>'
+      +'<div class="fb-info"><div class="fb-name">'+esc(t.name)+'</div>'
+      +'<div class="fb-meta">'+esc(t.leadId)+' &middot; '+esc(t.email)+'</div>'
+      +'<div class="rbs"><span class="rb-pill" style="background:#0d2d1e;color:var(--r1c)">R1: '+t.r1+'</span>'
+      +'<span class="rb-pill" style="background:#2d1f08;color:var(--r2c)">R2: '+t.r2+'</span>'
+      +'<span class="rb-pill" style="background:#2d0f12;color:var(--r3c)">R3: '+t.r3+'</span></div></div>'
+      +'<div class="fb-score">'+t.score+'</div>'
+      +'</div>';
+  }).join('')||'<div style="text-align:center;padding:2rem;color:var(--muted)">No teams yet.</div>';
+  var s=document.getElementById('board-sub'); if(s) s.textContent=teams.length+' team'+(teams.length!==1?'s':'')+' competing';
+}
+
+function renderMini(){
+  var el=document.getElementById('t-mini'); if(!el) return;
+  var sorted=teams.slice().sort(function(a,b){ return b.score-a.score; });
+  el.innerHTML=sorted.map(function(t,i){
+    var me=currentTeam&&t.name===currentTeam.name;
+    return '<div class="mini-chip'+(me?' me':'')+'"><span>'+(i+1)+'. '+esc(t.name)+'</span><span class="mini-sc">'+t.score+'</span></div>';
+  }).join('');
+}
+
+pickRole('team');
+renderBoard();
+
+// Show setup banner if Firebase config is still placeholder
+if(firebaseConfig.apiKey==='YOUR_API_KEY'||!firebaseConfig.databaseURL||firebaseConfig.databaseURL.indexOf('YOUR_PROJECT')>=0){
+  document.getElementById('fb-setup-banner').style.display='block';
+}
+
+// Expose functions for inline onclick handlers (module scope is isolated)
+window.pickRole=pickRole; window.doLogin=doLogin; window.goLogout=goLogout;
+window.openOv=openOv; window.closeOv=closeOv;
+window.confirmReg=confirmReg; window.addTeamManual=addTeamManual;
+window.adjustScore=adjustScore; window.doReset=doReset;
+window.startTimer=startTimer; window.pauseTimer=pauseTimer; window.resetTimer=resetTimer;
+window.toggleAns=toggleAns; window.markDone=markDone; window.switchLang=switchLang;
+</script>
+</body>
+</html>
