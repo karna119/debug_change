@@ -1,376 +1,3 @@
-
-
-index.html
-html
-
-Right now the app stores team data in browser memory only — meaning each person who opens the URL gets a fresh empty state. Teams registering on their phone won't show up on the host's laptop.
-To make it truly shared (scores sync across all devices), you'd need a small backend. The quickest free option for that is Firebase Realtime Database
-
-4:40 AM
-Let me look at your app first, then check the skill files.
-
-
-Viewed 2 files
-Viewed 2 files
-Now I have a full picture of the app. Let me build the Firebase-powered version.
-
-
-View truncated modal section
-View truncated modal section
-Now I have everything I need. Let me build the full Firebase-integrated version.
-
-
-Copy the file to working directory
-Copy the file to working directory
-Now I'll rewrite the JavaScript section to integrate Firebase Realtime Database. The key changes are:
-
-Add Firebase SDK imports
-Replace in-memory teams array with Firebase listeners
-Sync team registration, score changes, and resets to Firebase
-
-Replace the script block with Firebase-powered version
-Replace the script block with Firebase-powered version
-Now replace the confirmReg and addTeamManual functions to write to Firebase instead of pushing to a local array:
-
-
-Edited 4 files
-Edited 4 files
-Now close the module script tag at the end and expose functions globally (since module scope is isolated from inline onclick attributes):
-
-
-Expose all functions on window and close module script, then remove old closing script tag
-Expose all functions on window and close module script, then remove old closing script tag
-Now add a visible setup banner at the top of the landing page so whoever opens the file knows if Firebase isn't configured yet:
-
-
-Add a setup notice banner inside the landing page box
-Add a setup notice banner inside the landing page box
-Now show the banner when the config is still placeholder, and add a connection status dot to the topbar:
-
-
-Show setup banner if config is placeholder, add Firebase init error handler and connection status
-Show setup banner if config is placeholder, add Firebase init error handler and connection status
-Add a live connection indicator to the admin topbar:
-
-
-Add Firebase live indicator to admin topbar
-Add Firebase live indicator to admin topbar
-Now wire up the connection dot using Firebase's .info/connected:
-
-
-Edited a file, ran a command, read a file
-Edited a file, ran a command, read a file
-The file is ready. Here's exactly what to do to get it live:
-
-Setup (5 minutes)
-1. Create a Firebase project
-
-Go to console.firebase.google.com → Add project → give it any name → continue through the steps.
-2. Add a Realtime Database
-
-In the left sidebar: Build → Realtime Database → Create database
-Choose any region, start in test mode (you can lock it down after the event).
-3. Get your config
-
-Go to ⚙️ Project Settings → scroll to Your apps → Add app → Web (</>).
-Copy the firebaseConfig object it gives you.
-4. Paste it into the file
-
-Open index.html, find the firebaseConfig = { block near the bottom of the script, and replace the "YOUR_..." placeholder values with your real ones.
-5. Open the file in any browser — done. Every device that opens the same file (or you can host it free on Firebase Hosting or GitHub Pages) will share live state.
-
-What's synced in real time
-Action	Synced to all devices
-Team registers	✅ instantly
-Host adjusts score ±10	✅ instantly
-Host resets scores	✅ instantly
-Host manually adds team	✅ instantly
-Public leaderboard	✅ live
-Team score display	✅ live
-The green dot (🟢 DB) in the host panel's top-right corner confirms Firebase is connected. If it's red, there's a network or config issue.
-
-Index
-Code · HTML 
-where is firebase config
-
-4:50 AM
-In the downloaded index.html file, scroll to near the very bottom — just above the closing </script> tag. You'll see this block:
-
-js
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-Replace all 7 "YOUR_..." values with the real ones from Firebase. To get them:
-
-console.firebase.google.com → your project
-Click the ⚙️ gear icon → Project settings
-Scroll down to "Your apps" → click your web app (or create one with the </> button)
-Firebase shows you the exact firebaseConfig block — just copy-paste it over the placeholder
-
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Debug Challenge</title> <style> @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@400;600;700;800&d
-
-pasted
-
-5:10 AM
-Your Firebase config is already filled in correctly! I can see it in the file:
-
-js
-const firebaseConfig = {
-  apiKey: "AIzaSyCUzT5Yjpgdx9crbfQeSHlFF8O_pzNNURU",
-  authDomain: "bytexl-16e61.firebaseapp.com",
-  databaseURL: "https://bytexl-16e61-default-rtdb.firebaseio.com",
-  projectId: "bytexl-16e61",
-  ...
-};
-There's one small bug though — the setup banner check is comparing against your real API key instead of the placeholder string, so it'll incorrectly show the warning banner. Let me fix that quickly.
-
-
-Check current state of the file
-Check current state of the file
-The output file still has the placeholder — it's the document you pasted that has your real config. Let me patch your version directly:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Your config is in and the warning banner is fixed. The file is ready to use.
-
-One thing left to check — make sure your Realtime Database rules allow reads and writes, otherwise Firebase will silently reject everything. In the Firebase Console → your project → Realtime Database → Rules, set:
-
-json
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
-This is fine for a one-day event. After the competition, you can switch them back to false.
-
-Index
-Code · HTML 
-same issue
-admin not able to see the teams joined
-
-5:17 AM
-The problem is that teams register themselves by writing to Firebase, but the admin panel reads from the local teams array which is only populated by the onValue listener. Let me check if there's a timing or scope issue.
-
-
-Check onValue listener and renderAdminBoard wiring
-Check onValue listener and renderAdminBoard wiring
-Found it. The bug is on line 496 — when the host logs in, renderAdminBoard() is called immediately with whatever is in the local teams array at that moment. But onValue is async, so if it hasn't fired yet the array is empty. Also, renderAdminBoard() checks document.getElementById('a-board') which doesn't exist until after showPage('pg-admin') — except showPage is called on the same line, so the order matters.
-
-The real fix: don't call renderAdminBoard() manually anywhere — let the onValue listener be the single source of truth. Also the el null-guard in renderAdminBoard needs to be solid.
-
-
-Fix all the admin board rendering issues
-Fix all the admin board rendering issues
-Now let me verify the fixes look right:
-
-
-Verify all fixes applied correctly
-Verify all fixes applied correctly
-All good. Let me also verify the onValue still calls renderAdminBoard after the team filter:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Three things were wrong and are now fixed:
-
-Admin login was calling renderAdminBoard() before Firebase had responded — the onValue listener is async, so the teams array was empty at that moment. Removed that manual call; the listener handles it entirely.
-renderAdminBoard() was missing a null guard — if the #a-board element wasn't in the DOM yet, it would crash silently. Added if(!el) return.
-Junk Firebase keys could sneak into the teams array — added a .filter(t => t && t.name) so only valid team objects are kept.
-Now the flow is: team registers on phone → writes to Firebase → onValue fires on all open tabs including the host's → renderAdminBoard() runs automatically. The admin never needs to refresh.
-
-Index
-Code · HTML 
-same issue
-
-5:35 AM
-Let me actually debug this properly by looking at what's happening in the browser.
-
-
-Look at the full Firebase init and onValue block
-Look at the full Firebase init and onValue block
-I see the real problem. The onValue listener is set up at page load and fires immediately — but at that point the admin isn't logged in yet, so renderAdminBoard() runs against an empty #a-board that's on a hidden page. Then when the admin logs in later, there's no trigger to re-render. The listener already fired and won't fire again unless Firebase data changes.
-
-The fix: call renderAdminBoard() explicitly when logging in as admin, but after the page is shown.
-
-
-Ran 2 commands
-Ran 2 commands
-But wait — I also need to check if the Firebase rules are actually allowing reads. The most common silent failure is the DB rules are still in locked mode. Let me add visible error handling so you can actually see what's failing:
-
-
-Ran 2 commands, read a file
-Ran 2 commands, read a file
-Download this and open it. Then do two things before testing:
-
-1. Check your Firebase Rules — this is the most likely culprit. Go to Firebase Console → your project → Realtime Database → Rules tab and make sure it says:
-
-json
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
-If it says false anywhere, teams can't write and the host can't read. Hit Publish after changing.
-
-2. Open browser DevTools (F12) → Console tab while testing. The file now logs every Firebase event — you'll see either:
-
-[Firebase] teams updated: 1 ["Team Name"] → Firebase is working, it's a display bug
-[Firebase] READ ERROR: PERMISSION_DENIED → Rules are blocking reads
-Nothing at all → Firebase isn't connecting (check the DB URL or network)
-That error message will tell us exactly what's wrong.
-
-Index
-Code · HTML 
-where i have to check:
-* [Firebase] teams updated: 1 ["Team Name"] → Firebase is working, it's a display bug
-* [Firebase] READ ERROR: PERMISSION_DENIED → Rules are blocking reads
-* Nothing at all → Firebase isn't connecting (check the DB URL or network)
-
-5:40 AM
-Open your browser's DevTools Console:
-
-On laptop/desktop:
-
-Press F12 (or right-click anywhere on the page → Inspect)
-Click the Console tab at the top
-You'll see messages appearing there in real time as Firebase connects and teams register.
-
-It looks like this:
-
-
-
-Open the console on the host's laptop (the one where teams aren't showing up), then have a team register on their phone. You should see a log message appear within a second or two. Tell me which of the three messages you see and I'll fix it immediately.
-
-5:44 AM
-The console shows no Firebase messages at all — only a DOM warning about a password field. This means Firebase is not connecting/loading.
-
-The problem is clear: you're opening the file directly from your computer (file://) instead of a web server. ES modules (import) don't work on file:// — the browser blocks them.
-
-You need to serve it over HTTP. Easiest way:
-
-
-Check the current output file
-Check the current output file
-The fix is to switch from ES module import syntax to the Firebase CDN compat scripts, which work when opening the file directly. Let me rewrite the Firebase loading:
-
-
-Ran 3 commands
-Ran 3 commands
-All clean. Let me also check the module script tag is gone:
-
-
-Check module tag is gone and window exports are still there
-Check module tag is gone and window exports are still there
-The type="module" is gone (no longer needed) and the window.* exports are still there. But actually since it's no longer a module, those window.* assignments are now redundant — functions are already global. No harm though.
-
-
-Presented file
-Presented file
-Root cause: The original code used import statements (type="module") which browsers block when opening a file directly from your desktop (file://). Switched to Firebase's compat SDK — two plain <script> tags that load from Google's CDN and work fine with file://.
-
-Download and open the new file. The console should now show [Firebase] teams updated: ... as soon as it loads.
-
-Index
-Code · HTML 
-can i save this file in github and deploy
-
-5:45 AM
-Yes! GitHub Pages is free and perfect for this. Here's exactly how:
-
-1. Create a GitHub account (if you don't have one) at github.com
-
-2. Create a new repository
-
-Click the + icon → New repository
-Name it anything e.g. debug-challenge
-Set it to Public
-Click Create repository
-3. Upload the file
-
-Click Add file → Upload files
-Drag and drop your index.html
-Click Commit changes
-4. Enable GitHub Pages
-
-Go to Settings (top of your repo)
-Click Pages in the left sidebar
-Under Source, select Deploy from a branch
-Branch: main, folder: / (root)
-Click Save
-5. Your live URL will be:
-
-https://YOUR-USERNAME.github.io/debug-challenge/
-GitHub shows the URL in the Pages settings after ~1 minute.
-
-That URL is what you share with everyone — teams open it on their phones, host opens it on the laptop, leaderboard on the projector. Since Firebase is doing the sync, it all works from the same URL regardless of device.
-
-questions are not sharing to students from admin
-no indivividual timelimit for round 1
-total 20 min for 10 questionswhen admin start the round, all questions shoulbe present on their screen
-
-6:01 AM
-Got it. Three clear features to build:
-
-Admin starts a round → all students instantly see all questions for that round
-One shared 20-min timer for Round 1 (not per-question)
-Students see all questions at once (not waiting screen)
-Let me rewrite the relevant parts:
-
-
-Viewed 4 files
-Viewed 4 files
-Now I have a complete picture. I'll do a full rewrite of the logic with these changes:
-
-Admin gets "Start Round" buttons — clicking writes {activeRound, startedAt} to Firebase
-Students listen to Firebase — when round starts, all questions for that round appear instantly
-Timer is round-wide — counts down from 20/5/10 min, synced via startedAt timestamp so all devices show same time
-
-Ran 9 commands, read a file
-Ran 9 commands, read a file
-Here's exactly how it now works:
-
-Admin side:
-
-Each round in the sidebar now has a ▶ Start Round button
-Clicking it writes {activeRound, startedAt, durationMs} to Firebase
-The timer counts down from the correct duration (20 min / 5 min / 10 min) — synced across all devices using the server timestamp so everyone sees the same countdown
-Stop Round button hides questions from students
-Student side:
-
-While waiting → sees the bug emoji "Waiting for host..." screen
-The moment admin clicks ▶ Start Round 1 → all 10 Round 1 questions instantly appear on every student's phone simultaneously
-Timer in the student topbar counts down in sync with the host
-Index
-Code · HTML 
-Uncaught Error: Uncaught ReferenceError: firebase is not defined
-6:03 AM
-The compat scripts are loading after the code runs. Need to move them to the <head>.
-
-
-Ran 3 commands, read a file
-Ran 3 commands, read a file
-Fixed. The Firebase scripts are now in <head> so they load before any code tries to use firebase. Download, replace the file in your GitHub repo, and it should work.
-
-Index
-Code · HTML 
-
-
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-Index · HTML
-Copy
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -520,7 +147,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
- 
+
 <!-- LANDING -->
 <div id="pg-landing" class="page show">
   <div class="land-box">
@@ -554,7 +181,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
     <div class="errmsg" id="errmsg">Please check your details and try again.</div>
   </div>
 </div>
- 
+
 <!-- ADMIN -->
 <div id="pg-admin" class="page">
   <div class="topbar">
@@ -603,7 +230,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
     </div>
   </div>
 </div>
- 
+
 <!-- TEAM -->
 <div id="pg-team" class="page">
   <div class="t-topbar">
@@ -636,7 +263,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
     <div class="mini-row" id="t-mini"></div>
   </div>
 </div>
- 
+
 <!-- PUBLIC BOARD -->
 <div id="pg-board" class="page">
   <div class="board-title">Debug <em>Challenge</em></div>
@@ -644,7 +271,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
   <div class="full-board" id="full-board"></div>
   <button class="btn-s" onclick="goLogout()" style="margin-top:1.5rem">&#8592; Back</button>
 </div>
- 
+
 <!-- MODALS -->
 <div class="overlay" id="ov-reset">
   <div class="modal">
@@ -678,9 +305,9 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
     </div>
   </div>
 </div>
- 
+
 <script>
- 
+
 // ─────────────────────────────────────────────
 //  🔥 PASTE YOUR FIREBASE CONFIG HERE
 //  1. Go to https://console.firebase.google.com
@@ -698,11 +325,11 @@ const firebaseConfig = {
   messagingSenderId: "228464294329",
   appId: "1:228464294329:web:5517f6ed1a3fe8c56bde68"
 };
- 
+
 const app = firebase.initializeApp(firebaseConfig);
 const db  = firebase.database();
 const teamsRef = db.ref('teams');
- 
+
 // ─────────────────────────────────────────────
 //  App state
 // ─────────────────────────────────────────────
@@ -720,7 +347,7 @@ var timerIv = null;
 var roundTimerIv = null;
 var pendingReg = null;
 var ROUND_MINS = {1:20, 2:5, 3:10};
- 
+
 // ─────────────────────────────────────────────
 //  Real-time listener — syncs ALL devices
 // ─────────────────────────────────────────────
@@ -748,7 +375,7 @@ teamsRef.on('value', function(snapshot) {
     banner.innerHTML='🔴 <strong>Firebase error: ' + error.code + '</strong> — Check Realtime Database Rules: set .read and .write to true.';
   }
 });
- 
+
 // Game state listener — drives student screens
 db.ref('game').on('value', function(snap){
   var g = snap.val() || {};
@@ -757,15 +384,15 @@ db.ref('game').on('value', function(snap){
   if(currentTeam) renderTeamScreen();
   syncRoundTimer();
 });
- 
+
 // Connection state indicator
 db.ref('.info/connected').on('value', function(snap){
   var dot = document.getElementById('fb-dot-circle');
   if(dot) dot.style.background = snap.val() ? 'var(--accent)' : 'var(--danger)';
 });
- 
+
 var LANGC = {Python:'var(--py)',Java:'var(--java)',C:'var(--clang)'};
- 
+
 var QS = [
   {id:'r1q1',round:1,num:'Q1',title:'The Off-By-One Criminal',lang:'Python',
    funny:"This loop skipped the very first item. Blamed it on Monday morning.",
@@ -868,16 +495,16 @@ var QS = [
    bl:[3],bugOut:'99 (or garbage, or crash - UNDEFINED BEHAVIOUR)',goodOut:'[never use freed memory - set ptr = NULL after free]',
    ans:'Accessing freed memory = undefined behaviour. Fix: after free(ptr), set ptr = NULL and check before use.',pts:30}
 ];
- 
+
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showPage(id){ document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('show'); }); document.getElementById(id).classList.add('show'); }
 function openOv(id){ document.getElementById(id).classList.add('open'); }
 function closeOv(id){ document.getElementById(id).classList.remove('open'); }
- 
+
 document.querySelectorAll('.overlay').forEach(function(el){
   el.addEventListener('click',function(e){ if(e.target===el) el.classList.remove('open'); });
 });
- 
+
 function pickRole(role){
   currentRole=role;
   ['team','admin','board'].forEach(function(r){
@@ -886,7 +513,7 @@ function pickRole(role){
   });
   document.getElementById('errmsg').style.display='none';
 }
- 
+
 function doLogin(){
   var err=document.getElementById('errmsg');
   err.style.display='none';
@@ -911,7 +538,7 @@ function doLogin(){
     openOv('ov-confirm-reg');
   }
 }
- 
+
 function confirmReg(){
   if(!pendingReg) return;
   var t={name:pendingReg.name,leadId:pendingReg.leadId,email:pendingReg.email,score:0,r1:0,r2:0,r3:0};
@@ -920,7 +547,7 @@ function confirmReg(){
   closeOv('ov-confirm-reg');
   db.ref('teams/'+key).set(t).then(function(){ enterTeam(t); });
 }
- 
+
 function enterTeam(t){
   currentTeam=t;
   document.getElementById('td-name').textContent=t.name;
@@ -929,7 +556,7 @@ function enterTeam(t){
   renderMini(); showPage('pg-team');
   renderTeamScreen();
 }
- 
+
 function renderTeamScreen(){
   var body=document.getElementById('t-body'); if(!body) return;
   var g=currentGame||{};
@@ -967,14 +594,14 @@ function renderTeamScreen(){
   html+='</div>';
   body.innerHTML=html;
 }
- 
+
 function goLogout(){
   currentTeam=null; currentQ=null;
   clearInterval(timerIv); timerRunning=false;
   ['in-tname','in-tid','in-temail','in-apass'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   showPage('pg-landing'); pickRole('team');
 }
- 
+
 function buildSidebar(){
   [1,2,3].forEach(function(r){
     var el=document.getElementById('sl-r'+r); el.innerHTML='';
@@ -988,20 +615,20 @@ function buildSidebar(){
     });
   });
 }
- 
+
 function loadQ(q){
   currentQ=q; currentLang=q.lang||(q.langs&&q.langs[0])||'Python';
   document.querySelectorAll('.qi').forEach(function(i){ i.classList.remove('act'); });
   var el=document.getElementById('qi-'+q.id); if(el) el.classList.add('act');
   renderQ(q);
 }
- 
+
 function buildCode(code,bl){
   return (code||'').split('\n').map(function(line,i){
     var e=esc(line); return (bl||[]).indexOf(i)>=0?'<span class="bl">'+e+'</span>':e;
   }).join('\n');
 }
- 
+
 function renderQ(q){
   var isM=!!q.langs;
   var lh=isM?q.langs.map(function(l){ return '<span class="rbadge b'+l.toLowerCase()+'">'+l+'</span>'; }).join(''):('<span class="rbadge b'+(q.lang||'').toLowerCase()+'">'+q.lang+'</span>');
@@ -1034,22 +661,22 @@ function renderQ(q){
     +'<div class="ans-box" id="qans">'+esc(q.ans)+'</div>';
   updateTD();
 }
- 
+
 function switchLang(l){
   if(!currentQ||!currentQ.langs) return;
   currentLang=l;
   document.querySelectorAll('#qpanel .lbtn').forEach(function(b){ b.classList.toggle('act',b.textContent===l); });
   var el=document.getElementById('qcode'); if(el) el.innerHTML=buildCode(currentQ.codes[l],(currentQ.bls||{})[l]||[]);
 }
- 
+
 function toggleAns(){ var b=document.getElementById('qans'); if(b) b.classList.toggle('vis'); }
 function markDone(){
   if(!currentQ) return; doneSet[currentQ.id]=true;
   var el=document.getElementById('qi-'+currentQ.id); if(el){ el.classList.add('done'); el.classList.remove('act'); }
 }
- 
+
 function pad(n){ return n<10?'0'+n:''+n; }
- 
+
 // ── Admin: start/stop round (writes to Firebase, all devices react) ──
 function startRound(r){
   var mins = ROUND_MINS[r] || 20;
@@ -1058,7 +685,7 @@ function startRound(r){
 function stopRound(){
   db.ref('game').set({activeRound: 0, startedAt: 0, durationMs: 0});
 }
- 
+
 // ── Sync timer display from Firebase game state (runs on ALL devices) ──
 function syncRoundTimer(){
   clearInterval(roundTimerIv);
@@ -1084,7 +711,7 @@ function setTimerDisplay(txt, cls){
   var el=document.getElementById('a-timer'); if(el){ el.textContent=txt; el.className='timer-big'+cls; }
   var tel=document.getElementById('td-timer'); if(tel) tel.textContent=txt;
 }
- 
+
 // ── Keep admin round badge updated ──
 function updateAdminRoundBadge(){
   var b=document.getElementById('a-rbadge'); if(!b) return;
@@ -1092,14 +719,14 @@ function updateAdminRoundBadge(){
   if(!r){ b.textContent='No Round'; b.className='rbadge'; return; }
   b.textContent='Round '+r; b.className='rbadge '+['','rb1','rb2','rb3'][r];
 }
- 
+
 // Legacy per-question timer kept for admin question preview only
 function setTimer(s){ timerSecs=s; }
 function startTimer(){}
 function pauseTimer(){}
 function resetTimer(){}
 function updateTD(){}
- 
+
 function adjustScore(name,delta){
   var t=null; for(var i=0;i<teams.length;i++){ if(teams[i].name===name){ t=teams[i]; break; } }
   if(!t) return;
@@ -1109,7 +736,7 @@ function adjustScore(name,delta){
   var key=name.replace(/[.#$\[\]]/g,'_');
   db.ref('teams/'+key).update(patch);
 }
- 
+
 function renderAdminBoard(){
   var el=document.getElementById('a-board');
   if(!el) return;
@@ -1127,9 +754,9 @@ function renderAdminBoard(){
   }).join('');
   updateTC();
 }
- 
+
 function updateTC(){ var el=document.getElementById('tc-label'); if(el) el.textContent=teams.length+' team'+(teams.length!==1?'s':''); }
- 
+
 function doReset(){
   var patch={};
   teams.forEach(function(t){
@@ -1141,7 +768,7 @@ function doReset(){
   });
   db.ref('/').update(patch).then(function(){ closeOv('ov-reset'); });
 }
- 
+
 function addTeamManual(){
   var n=document.getElementById('at-name').value.trim();
   var id=document.getElementById('at-id').value.trim();
@@ -1152,7 +779,7 @@ function addTeamManual(){
   document.getElementById('at-name').value=''; document.getElementById('at-id').value=''; document.getElementById('at-email').value='';
   db.ref('teams/'+key).set(t).then(function(){ closeOv('ov-addteam'); });
 }
- 
+
 function renderBoard(){
   var el=document.getElementById('full-board'); if(!el) return;
   var sorted=teams.slice().sort(function(a,b){ return b.score-a.score; });
@@ -1170,7 +797,7 @@ function renderBoard(){
   }).join('')||'<div style="text-align:center;padding:2rem;color:var(--muted)">No teams yet.</div>';
   var s=document.getElementById('board-sub'); if(s) s.textContent=teams.length+' team'+(teams.length!==1?'s':'')+' competing';
 }
- 
+
 function renderMini(){
   var el=document.getElementById('t-mini'); if(!el) return;
   var sorted=teams.slice().sort(function(a,b){ return b.score-a.score; });
@@ -1179,15 +806,15 @@ function renderMini(){
     return '<div class="mini-chip'+(me?' me':'')+'"><span>'+(i+1)+'. '+esc(t.name)+'</span><span class="mini-sc">'+t.score+'</span></div>';
   }).join('');
 }
- 
+
 pickRole('team');
 renderBoard();
- 
+
 // Show setup banner if Firebase config is still placeholder
 if(firebaseConfig.apiKey==='YOUR_API_KEY'||!firebaseConfig.databaseURL||firebaseConfig.databaseURL.indexOf('YOUR_PROJECT')>=0){
   document.getElementById('fb-setup-banner').style.display='block';
 }
- 
+
 // Expose functions for inline onclick handlers (module scope is isolated)
 window.pickRole=pickRole; window.doLogin=doLogin; window.goLogout=goLogout;
 window.openOv=openOv; window.closeOv=closeOv;
@@ -1199,7 +826,3 @@ window.startRound=startRound; window.stopRound=stopRound;
 </script>
 </body>
 </html>
- 
-
-
-
