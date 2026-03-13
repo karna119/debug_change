@@ -139,7 +139,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
 .editor-wrap{margin-top:.75rem;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .editor-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border)}
 .editor-bar span{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
-.editor-area{width:100%;min-height:120px;background:#060d1a;color:#e8f0fe;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;padding:.75rem 1rem;border:none;outline:none;resize:vertical;tab-size:4}
+.editor-area{width:100%;height:180px;}
 .run-btn{padding:5px 14px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:var(--bg);font-family:'Syne',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px}
 .run-btn:disabled{opacity:.5;cursor:not-allowed}
 .run-output{padding:.75rem 1rem;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;min-height:40px;white-space:pre-wrap;border-top:1px solid var(--border)}
@@ -158,6 +158,7 @@ body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-he
 </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
 </head>
 <body>
 
@@ -638,7 +639,7 @@ function renderTeamScreen(){
     html+='<div class="editor-wrap">';
     html+='<div class="editor-bar"><span>&#9998; Fix &amp; Run your solution ('+lang+')</span>';
     html+='<button class="run-btn" id="'+btnId+'" onclick="runCode(\''+q.id+'\',\''+lang+'\')">&#9654; Run</button></div>';
-    html+='<textarea class="editor-area" id="'+editorId+'" spellcheck="false"></textarea>';
+    html+='<div class="editor-area" id="'+editorId+'"></div>';
     html+='<div class="run-output idle" id="'+outputId+'">Output will appear here...</div>';
     html+='</div>';
     html+='</div>';
@@ -647,17 +648,30 @@ function renderTeamScreen(){
 
   body.innerHTML='<div class="sq-list">'+cards.join('')+'</div>';
 
-  // Populate editors with raw code via .value (avoids HTML encoding issues)
-  qs.forEach(function(q){
-    var lang=q.lang||(q.langs&&q.langs[0])||'Python';
-    var ta=document.getElementById('ed-'+q.id);
-    if(ta) ta.value=rawCode(q,lang);
-  });
-
-  // Enable Tab key in all editors
-  body.querySelectorAll('.editor-area').forEach(function(ta){
-    ta.addEventListener('keydown', function(e){
-      if(e.key==='Tab'){e.preventDefault();var s=ta.selectionStart;ta.value=ta.value.substring(0,s)+'    '+ta.value.substring(ta.selectionEnd);ta.selectionStart=ta.selectionEnd=s+4;}
+  // Init Monaco editors
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+  require(['vs/editor/editor.main'], function(){
+    qs.forEach(function(q){
+      var lang = q.lang||(q.langs&&q.langs[0])||'Python';
+      var monacoLang = lang==='Python'?'python': lang==='Java'?'java':'c';
+      var el = document.getElementById('ed-'+q.id);
+      if(!el) return;
+      var editor = monaco.editor.create(el, {
+        value: rawCode(q, lang),
+        language: monacoLang,
+        theme: 'vs-dark',
+        fontSize: 13,
+        minimap: {enabled: false},
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        lineNumbers: 'on',
+        wordWrap: 'on',
+        tabSize: 4,
+        renderLineHighlight: 'line',
+        scrollbar: {vertical:'hidden', handleMouseWheel: false}
+      });
+      // Store editor instance on the DOM element for later retrieval
+      el._monacoEditor = editor;
     });
   });
 }
@@ -676,8 +690,9 @@ function runCode(qid, lang){
   var ta=document.getElementById('ed-'+qid);
   var out=document.getElementById('out-'+qid);
   var btn=document.getElementById('btn-'+qid);
-  if(!ta||!out) return;
-  var code=ta.value;
+  if(!out) return;
+  // Read from Monaco editor if available, fallback to textarea
+  var code = (ta && ta._monacoEditor) ? ta._monacoEditor.getValue() : (ta ? ta.value : '');
   var pl=PISTON_LANG[lang]||PISTON_LANG.Python;
 
   out.className='run-output running';
